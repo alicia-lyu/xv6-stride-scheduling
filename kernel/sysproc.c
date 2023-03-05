@@ -102,6 +102,7 @@ sys_settickets(void) {
       proc->tickets = ticket_num;
     }
   }
+  
   return 0;
 }
 
@@ -122,7 +123,7 @@ int sys_getpinfo(void) {
     pstat->pass[index] = p->pass;
     pstat->pid[index] = p->pid;
     pstat->tickets[index] = p->pid;
-    pstat->strides[index] = max_stride / p->tickets;
+    pstat->strides[index] = MAX_STRIDE / p->tickets;
     pstat->pass[index] = p->pass;
   }
   release(&ptable.lock);

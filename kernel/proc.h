@@ -9,8 +9,7 @@
 #define SEG_UDATA 5  // user data+stack
 #define SEG_TSS   6  // this process's task state
 #define NSEGS     7
-
-extern int max_stride = 120;
+#define MAX_STRIDE 120 // the max stride constant
 
 // Per-CPU state
 struct cpu {
