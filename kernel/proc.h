@@ -10,6 +10,8 @@
 #define SEG_TSS   6  // this process's task state
 #define NSEGS     7
 
+extern int max_stride = 120;
+
 // Per-CPU state
 struct cpu {
   uchar id;                    // Local APIC ID; index into cpus[] below
@@ -74,7 +76,16 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
+  int tickets;
+  int pass;
 };
+
+struct ptable {
+  struct spinlock lock;
+  struct proc proc[NPROC];
+};
+
+extern struct ptable ptable;
 
 // Process memory is laid out contiguously, low addresses first:
 //   text

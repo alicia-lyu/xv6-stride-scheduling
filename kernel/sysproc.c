@@ -5,6 +5,7 @@
 #include "mmu.h"
 #include "proc.h"
 #include "sysfunc.h"
+#include "pstat.h"
 
 int
 sys_fork(void)
@@ -87,4 +88,43 @@ sys_uptime(void)
   xticks = ticks;
   release(&tickslock);
   return xticks;
+}
+
+int
+sys_settickets(void) {
+  int ticket_num;
+  if (argint(0, &ticket_num) < 0) {
+    proc->tickets = 1; // or return -1 ??
+  } else {
+    if (ticket_num < 1) {
+      return -1;
+    } else {
+      proc->tickets = ticket_num;
+    }
+  }
+  return 0;
+}
+
+int sys_getpinfo(void) {
+  struct pstat* pstat;
+  struct proc* p;
+  if(argptr(0, (void*)&pstat, sizeof(*pstat)) < 0) {
+    return -1;
+  }
+  acquire(&ptable.lock);
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+    int index = p - ptable.proc;
+    if (p->state == UNUSED) {
+      pstat->inuse[index] = 0;
+    } else {
+      pstat->inuse[index] = 1;
+    }
+    pstat->pass[index] = p->pass;
+    pstat->pid[index] = p->pid;
+    pstat->tickets[index] = p->pid;
+    pstat->strides[index] = max_stride / p->tickets;
+    pstat->pass[index] = p->pass;
+  }
+  release(&ptable.lock);
+  return 0;
 }

@@ -6,11 +6,6 @@
 #include "proc.h"
 #include "spinlock.h"
 
-struct {
-  struct spinlock lock;
-  struct proc proc[NPROC];
-} ptable;
-
 static struct proc *initproc;
 
 int nextpid = 1;
