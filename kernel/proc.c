@@ -6,6 +6,7 @@
 #include "proc.h"
 #include "spinlock.h"
 
+struct ptable ptable;
 static struct proc *initproc;
 
 int nextpid = 1;

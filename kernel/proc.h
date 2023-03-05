@@ -11,6 +11,8 @@
 #define NSEGS     7
 #define MAX_STRIDE 120 // the max stride constant
 
+#include "spinlock.h"
+
 // Per-CPU state
 struct cpu {
   uchar id;                    // Local APIC ID; index into cpus[] below

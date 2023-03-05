@@ -107,24 +107,27 @@ sys_settickets(void) {
 }
 
 int sys_getpinfo(void) {
+  acquire(&ptable.lock);
   struct pstat* pstat;
   struct proc* p;
   if(argptr(0, (void*)&pstat, sizeof(*pstat)) < 0) {
     return -1;
   }
-  acquire(&ptable.lock);
+  if (ptable.proc->pid < 0) {
+    return -1;
+  }
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
     int index = p - ptable.proc;
     if (p->state == UNUSED) {
       pstat->inuse[index] = 0;
     } else {
       pstat->inuse[index] = 1;
+      pstat->pass[index] = p->pass;
+      pstat->pid[index] = p->pid;
+      pstat->tickets[index] = p->pid;
+      pstat->strides[index] = MAX_STRIDE / p->tickets;
+      pstat->pass[index] = p->pass;
     }
-    pstat->pass[index] = p->pass;
-    pstat->pid[index] = p->pid;
-    pstat->tickets[index] = p->pid;
-    pstat->strides[index] = MAX_STRIDE / p->tickets;
-    pstat->pass[index] = p->pass;
   }
   release(&ptable.lock);
   return 0;
