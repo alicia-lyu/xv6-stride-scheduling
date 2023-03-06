@@ -124,9 +124,10 @@ int sys_getpinfo(void) {
       pstat->inuse[index] = 1;
       pstat->pass[index] = p->pass;
       pstat->pid[index] = p->pid;
-      pstat->tickets[index] = p->pid;
-      pstat->strides[index] = MAX_STRIDE / p->tickets;
+      pstat->tickets[index] = p->tickets;
+      pstat->strides[index] = p->stride;
       pstat->pass[index] = p->pass;
+      pstat->ticks[index] = p->ticks;
     }
   }
   release(&ptable.lock);

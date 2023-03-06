@@ -29,42 +29,60 @@ static struct proc*
 allocproc(void)
 {
   struct proc *p;
+  struct proc *p_instance;
+  int flag = 0;
   char *sp;
 
   acquire(&ptable.lock);
-  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
-    if(p->state == UNUSED)
-      goto found;
-  release(&ptable.lock);
-  return 0;
+  // find an unused process with the least pass
+  for(p_instance = ptable.proc; p_instance < &ptable.proc[NPROC]; p_instance++)
+    if(p_instance->state == UNUSED) {
+      p = p_instance;
+      break;
+    }
+  for(p_instance = ptable.proc; p_instance < &ptable.proc[NPROC]; p_instance++)
+    if(p_instance->state == UNUSED) {
+      flag = 1;
+      if (p_instance->pass < p->pass) {
+        p = p_instance;
+      } else if (p_instance->pass == p->pass) {
+        if (p_instance->stride < p->stride) {
+          p = p_instance;
+        }
+      }
+    }
+  // found
+  if (flag == 1) {
+    p->state = EMBRYO;
+    p->pid = nextpid++;
+    release(&ptable.lock);
 
-found:
-  p->state = EMBRYO;
-  p->pid = nextpid++;
-  release(&ptable.lock);
+    // Allocate kernel stack if possible.
+    if((p->kstack = kalloc()) == 0){
+      p->state = UNUSED;
+      return 0;
+    }
+    sp = p->kstack + KSTACKSIZE;
+    
+    // Leave room for trap frame.
+    sp -= sizeof *p->tf;
+    p->tf = (struct trapframe*)sp;
+    
+    // Set up new context to start executing at forkret,
+    // which returns to trapret.
+    sp -= 4;
+    *(uint*)sp = (uint)trapret;
 
-  // Allocate kernel stack if possible.
-  if((p->kstack = kalloc()) == 0){
-    p->state = UNUSED;
+    sp -= sizeof *p->context;
+    p->context = (struct context*)sp;
+    memset(p->context, 0, sizeof *p->context);
+    p->context->eip = (uint)forkret;
+
+    return p;
+  } else { // not found
+    release(&ptable.lock);
     return 0;
-  }
-  sp = p->kstack + KSTACKSIZE;
-  
-  // Leave room for trap frame.
-  sp -= sizeof *p->tf;
-  p->tf = (struct trapframe*)sp;
-  
-  // Set up new context to start executing at forkret,
-  // which returns to trapret.
-  sp -= 4;
-  *(uint*)sp = (uint)trapret;
-
-  sp -= sizeof *p->context;
-  p->context = (struct context*)sp;
-  memset(p->context, 0, sizeof *p->context);
-  p->context->eip = (uint)forkret;
-
-  return p;
+  } 
 }
 
 // Set up first user process.
@@ -81,6 +99,12 @@ userinit(void)
     panic("userinit: out of memory?");
   inituvm(p->pgdir, _binary_initcode_start, (int)_binary_initcode_size);
   p->sz = PGSIZE;
+  // initialize params for stride scheduling
+  p->tickets = 1;
+  p->stride = MAX_STRIDE;
+  p->pass = p->stride;
+  p->ticks = 0;
+
   memset(p->tf, 0, sizeof(*p->tf));
   p->tf->cs = (SEG_UCODE << 3) | DPL_USER;
   p->tf->ds = (SEG_UDATA << 3) | DPL_USER;
@@ -140,6 +164,11 @@ fork(void)
   np->sz = proc->sz;
   np->parent = proc;
   *np->tf = *proc->tf;
+  // inherit params for stride scheduling
+  np->tickets = proc->tickets;
+  np->stride = proc->stride ;
+  np->pass = np->stride;
+  np->ticks = 0;
 
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
@@ -251,33 +280,53 @@ wait(void)
 void
 scheduler(void)
 {
-  struct proc *p;
 
-  for(;;){
+  while (1)
+  {
+    int flag = 0;
+    struct proc *p;
+    struct proc *p_instance;
     // Enable interrupts on this processor.
     sti();
-
-    // Loop over process table looking for process to run.
     acquire(&ptable.lock);
-    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->state != RUNNABLE)
-        continue;
-
-      // Switch to chosen process.  It is the process's job
-      // to release ptable.lock and then reacquire it
-      // before jumping back to us.
-      proc = p;
-      switchuvm(p);
-      p->state = RUNNING;
-      swtch(&cpu->scheduler, proc->context);
-      switchkvm();
-
-      // Process is done running for now.
-      // It should have changed its p->state before coming back.
-      proc = 0;
+    // find the first runnable process
+    for(p_instance = ptable.proc; p_instance < &ptable.proc[NPROC]; p_instance++)
+      if(p_instance->state == RUNNABLE) {
+        flag = 1;
+        p = p_instance;
+        break;
+      }
+    if (flag == 0) {
+      release(&ptable.lock);
+      continue;
     }
+    // find the process with the least pass
+    for(p_instance = ptable.proc; p_instance < &ptable.proc[NPROC]; p_instance++)
+      if(p_instance->state == RUNNABLE) {
+        if (p_instance->pass < p->pass) {
+          p = p_instance;
+        } else if (p_instance->pass == p->pass) { // break ties
+          if (p_instance->stride < p->stride) {
+            p = p_instance;
+          }
+      }
+      }
+    // no process runnable
+    // run the chosen process for a time slot
+    // Switch to chosen process.  It is the process's job
+    // to release ptable.lock and then reacquire it
+    // before jumping back to us.
+    proc = p;
+    switchuvm(p);
+    p->state = RUNNING;
+    p->pass += p->stride;
+    p->ticks++;
+    swtch(&cpu->scheduler, proc->context);
+    switchkvm();
+    // Process is done running for now.
+    // It should have changed its p->state before coming back.
+    proc = 0;
     release(&ptable.lock);
-
   }
 }
 
