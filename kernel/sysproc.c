@@ -95,15 +95,17 @@ sys_settickets(void) {
   int ticket_num;
   if (argint(0, &ticket_num) < 0) {
     proc->tickets = 1; // or return -1 ??
-  } else {
-    if (ticket_num < 1) {
-      return -1;
-    } else {
-      proc->tickets = ticket_num;
-    }
+    proc->stride = MAX_STRIDE / proc->tickets + 1;
+    return 0;
   }
-  
-  return 0;
+
+  if (ticket_num < 1) {
+    return -1;
+  } else {
+    proc->tickets = ticket_num;
+    proc->stride = MAX_STRIDE / proc->tickets + 1; // in case tickets are too high that stride = 0
+    return 0;
+  }
 }
 
 int sys_getpinfo(void) {
@@ -111,9 +113,11 @@ int sys_getpinfo(void) {
   struct pstat* pstat;
   struct proc* p;
   if(argptr(0, (void*)&pstat, sizeof(*pstat)) < 0) {
+    release(&ptable.lock);
     return -1;
   }
-  if (ptable.proc->pid < 0) {
+  if (pstat == 0) {
+    release(&ptable.lock);
     return -1;
   }
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++) {

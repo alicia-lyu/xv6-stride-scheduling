@@ -166,7 +166,7 @@ fork(void)
   *np->tf = *proc->tf;
   // inherit params for stride scheduling
   np->tickets = proc->tickets;
-  np->stride = proc->stride ;
+  np->stride = proc->stride;
   np->pass = np->stride;
   np->ticks = 0;
 
