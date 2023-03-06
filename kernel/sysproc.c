@@ -94,8 +94,8 @@ int
 sys_settickets(void) {
   int ticket_num;
   if (argint(0, &ticket_num) < 0) {
-    proc->tickets = 1; // or return -1 ??
-    proc->stride = MAX_STRIDE / proc->tickets + 1;
+    proc->tickets = 1;
+    proc->stride = MAX_STRIDE;
     return 0;
   }
 
@@ -103,7 +103,13 @@ sys_settickets(void) {
     return -1;
   } else {
     proc->tickets = ticket_num;
-    proc->stride = MAX_STRIDE / proc->tickets + 1; // in case tickets are too high that stride = 0
+    double stride_double = (double)MAX_STRIDE / proc->tickets;
+    int stride_int = MAX_STRIDE / proc->tickets;
+    if (stride_double > stride_int) {
+      proc->stride = stride_int + 1; // in case tickets are too high that stride = 0
+    } else {
+      proc->stride = stride_int;
+    }
     return 0;
   }
 }
